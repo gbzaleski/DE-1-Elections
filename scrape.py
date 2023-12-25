@@ -42,7 +42,6 @@ def unzip_all_files(path: str) -> None:
         for file in files:
             if file.endswith(".zip"):
                 file_path = os.path.join(root, file)
-                print(f"Unzipping {file_path}")
                 with zipfile.ZipFile(file_path, "r") as zip_ref:
                     zip_ref.extractall(root)
 
