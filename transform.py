@@ -1,8 +1,11 @@
 #!/usr/bin/env python
+import argparse
+import io
+import json
 import minio
 import os
 import sys
-
+import tempfile
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Tuple
 import pandas as pd
@@ -12,18 +15,39 @@ from DivisorMethods import *
 
 CONSTITUENCIES = 41
 
+
+FILENAMES_BY_YEAR = {
+    2019: {
+        "results": "wyniki_gl_na_listy_po_okregach_sejm_utf8.csv",
+        "districts": "okregi_sejm_utf8.csv"
+    },
+    2023: {
+        "results": "wyniki_gl_na_listy_po_okregach_sejm_utf8.csv",
+        "districts": "okregi_sejm_utf8.csv"
+    }
+}
+
+
+
+
 class Apportionment(ABC):
     """Abstract class representing a method of counting votes."""
 
+    @staticmethod
+    @abstractmethod
+    def name() -> str:
+        pass
+
+
     #To chyba powinno byc wspolne dla wszystkich metod
-    def load_data(self, district_results, candadates_results) -> None:
+    def load_data(self, results, districts) -> None:
         """Loads the data about the results of the elections."""
 
         # Data from https://wybory.gov.pl/sejmsenat2023/pl/dane_w_arkuszach
         # te dwa ready to argumenty z minio
-        df = pd.read_csv('wyniki.csv', sep=";").fillna(0)
+        df = results.fillna(0)
         parties = pd.concat([df, df.apply(['sum'])]).iloc[:, 25:].set_index([pd.Index(range(1, CONSTITUENCIES + 2))])
-        constituences = pd.read_csv('okregi.csv', sep=";").iloc[:, [0,1,5,6]].set_index('Numer okręgu')
+        constituences = districts.iloc[:, [0,1,5,6]].set_index('Numer okręgu')
 
         # Joining results with constituences information
         ed = constituences.join(parties) # election data
@@ -61,8 +85,17 @@ class Apportionment(ABC):
         pass
 
 
+    @staticmethod
+    def encode_number_of_seats_in_df(seats: Dict[str, int]) -> pd.DataFrame:
+        return pd.DataFrame(list(seats.items()), columns=['party', 'seats'])
+
+
 # Current system
-class ConstituencialDHondt(Apportionment): 
+class ConstituencialDHondt(Apportionment):
+    @staticmethod
+    def name() -> str:
+        return "constituencial-dhondt"
+
     def calculate(self) -> Tuple[Dict[str, int], Dict[Any, Any]]:
         sum_parties = dict([(name, 0) for name in self.comitties])
         last_seat_data = {}
@@ -79,14 +112,24 @@ class ConstituencialDHondt(Apportionment):
 
 
 class GlobalDHondt(Apportionment): 
-    def calculate(self) -> Tuple[Dict[str, int], Dict[Any, Any]]: 
+    @staticmethod
+    def name() -> str:
+        return "global-dhondt"
+
+
+    def calculate(self) -> Tuple[Dict[str, int], Dict[Any, Any]]:
         data_global = [(com, self.ed.loc["sum"][com]) for com in self.comitties]
         result, last_seat_data = runDHondt(data_global, self.SEATS)
         return (result, {"last_seat_data":last_seat_data}) 
 
 
 class SquaredDHondt(Apportionment): 
-    def calculate(self) -> Tuple[Dict[str, int], Dict[Any, Any]]: 
+    @staticmethod
+    def name() -> str:
+        return "squared-dhondt"
+
+
+    def calculate(self) -> Tuple[Dict[str, int], Dict[Any, Any]]:
         data_global = [(com, self.ed.loc["sum"][com]) for com in self.comitties]
         sum_votes = sum(val for (_,val) in data_global)
         data_global_sq = [(com, val * (1 + val/sum_votes)) for (com, val) in data_global]
@@ -95,6 +138,11 @@ class SquaredDHondt(Apportionment):
 
 
 class ConstituencialSainteLague(Apportionment):
+    @staticmethod
+    def name() -> str:
+        return "constituencial-sainte-lague"
+
+
     def calculate(self) -> Tuple[Dict[str, int], Dict[Any, Any]]:
         sum_parties = dict([(name, 0) for name in self.comitties])
 
@@ -107,14 +155,24 @@ class ConstituencialSainteLague(Apportionment):
         return (sum_parties, None)
 
 
-class GlobalSainteLague(Apportionment): 
-    def calculate(self) -> Tuple[Dict[str, int], Dict[Any, Any]]: 
+class GlobalSainteLague(Apportionment):
+    @staticmethod
+    def name() -> str:
+        return "global-sainte-lague"
+
+
+    def calculate(self) -> Tuple[Dict[str, int], Dict[Any, Any]]:
         data_global = [(com, self.ed.loc["sum"][com]) for com in self.comitties]
         result, last_seat_data = runSainteLague(data_global, self.SEATS)
         return (result, {"last_seat_data":last_seat_data})  
 
 
 class FairVoteWeightDhonth(Apportionment):
+    @staticmethod
+    def name() -> str:
+        return "fair-vote-weight-dhonth"
+
+
     def calculate(self):
         self.ed['True proportion'] = self.ed['Liczba głosów ważnych oddanych łącznie na wszystkie listy kandydatów'] * self.SEATS / self.VOTES
         self.ed['Voter Strength'] = 100*self.ed['Liczba mandatów'] / self.ed['True proportion'] - 100
@@ -170,7 +228,7 @@ class FairVoteWeightDhonth(Apportionment):
 
 def select_method(method: str) -> Apportionment:
     """Selects the method of counting votes based on the name."""
-    if method == "sainte_lague":
+    if method == ConstituencialSainteLague.name():
         return ConstituencialSainteLague()
     if method == "dhondt":
         raise NotImplementedError()
@@ -179,19 +237,57 @@ def select_method(method: str) -> Apportionment:
     raise NotImplementedError()
 
 
-def save_results(minio_client: minio.Minio, votes: Dict[str, int], info: Dict[Any, Any]) -> None:
-    pass
+def additional_info_obj_name(apportionment) -> str:
+    return f"{apportionment.name()}-additional-info.json"
 
+
+def seats_obj_name(apportionment) -> str:
+    return f"{apportionment.name()}-seats.csv"
+
+
+def save_results(minio_client: minio.Minio, bucket_configuration: minio_communication.MinioBucketConfigurationForYear, apportionment: Apportionment, seats: Dict[str, int], additional_info: Dict[Any, Any]) -> None:
+    additional_info_json_bytes = json.dumps(additional_info).encode("utf-8")
+
+    seats_df = apportionment.encode_number_of_seats_in_df(seats)
+    seats_bytes_buffer = io.BytesIO()
+    seats_df.to_csv(seats_bytes_buffer, index=False, encoding="utf-8")
+
+    seats_bytes = seats_bytes_buffer.getvalue()
+
+    minio_client.put_object(bucket_configuration.transformed_data_bucket, seats_obj_name(apportionment), io.BytesIO(seats_bytes), len(seats_bytes), content_type='text/csv')
+
+
+def load_districts(minio_client, bucket_configuration: minio_communication.MinioBucketConfigurationForYear, year):
+    response = minio_client.get_object(bucket_configuration.raw_data_bucket, FILENAMES_BY_YEAR[year]["districts"])
+    csv_data = pd.read_csv(io.BytesIO(response.read()), sep=";")
+    return csv_data
+
+
+def load_results(minio_client, bucket_configuration: minio_communication.MinioBucketConfigurationForYear, year):
+    response = minio_client.get_object(bucket_configuration.raw_data_bucket, FILENAMES_BY_YEAR[year]["results"])
+    csv_data = pd.read_csv(io.BytesIO(response.read()), sep=";")
+    return csv_data
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--year', type=int, default=2023,
+                        help='year to analyze')
+    parser.add_argument('--apportionment', type=str, default=ConstituencialSainteLague.name(),
+                        help='apportionment')
+    return parser.parse_args()
 
 def main() -> None:
-    apportionment = select_method(sys.argv[1])
+    program_args = parse_args()
+    apportionment = select_method(program_args.apportionment)
     minio_client = minio_communication.get_client()
-    district_results = None # TODO: get district results from minio
-    candadates_results = None # TODO: get candadates results from minio
-    apportionment.load_data(district_results, candadates_results)
-    votes, info = apportionment.calculate()
-    save_results(minio_client, votes, info)
+    bucket_configuration = minio_communication.get_minio_bucket_configuration(program_args.year)
 
+    districts = load_districts(minio_client, bucket_configuration, program_args.year)
+    results = load_results(minio_client, bucket_configuration, program_args.year) # TODO: get candadates results from minio
+
+    apportionment.load_data(results, districts)
+    seats, info = apportionment.calculate()
+    save_results(minio_client, bucket_configuration, apportionment, seats, info)
 
 if __name__ == "__main__":
     main()

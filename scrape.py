@@ -11,13 +11,13 @@ from typing import List, Tuple
 import minio_communication
 
 LINKS_BY_YEAR = {
-    2019: (
-        "https://wybory.gov.pl/sejmsenat2019/data/csv/wyniki_gl_na_kand_po_obwodach_sejm_csv.zip",
-        "http://wybory.gov.pl/sejmsenat2019/data/csv/wyniki_gl_na_listy_po_obwodach_sejm_csv.zip"),
-    2023: (
-        "http://wybory.gov.pl/sejmsenat2023/data/csv/wyniki_gl_na_kandydatow_po_obwodach_sejm_csv.zip",
-        "http://wybory.gov.pl/sejmsenat2023/data/csv/wyniki_gl_na_listy_po_obwodach_sejm_csv.zip"
-    )
+    2019: [
+        "https://wybory.gov.pl/sejmsenat2019/data/csv/okregi_sejm_csv.zip",
+        "http://wybory.gov.pl/sejmsenat2019/data/csv/wyniki_gl_na_listy_po_okregach_sejm_csv.zip"],
+    2023: [
+        "http://wybory.gov.pl/sejmsenat2023/data/csv/okregi_sejm_csv.zip",
+        "http://wybory.gov.pl/sejmsenat2023/data/csv/wyniki_gl_na_listy_po_okregach_sejm_csv.zip"
+    ]
 }
 
 def temporary_direrctory() -> str:
@@ -69,7 +69,7 @@ def upload_csv_files(minio_client: minio.Minio, year: int, csv_files: List[Tuple
         if obj_name in obj_names:
             raise ValueError(f"Multiple files with same basename {obj_name}")
         obj_names.add(obj_name)
-        minio_communication.upload(minio_client, bucket_name, obj_name, csv_file_path)
+        minio_communication.upload_file(minio_client, bucket_name, obj_name, csv_file_path)
 
 
 def main() -> None:
@@ -80,16 +80,15 @@ def main() -> None:
         year_dirname = os.path.join(directory, str(year))
         os.makedirs(year_dirname)
 
-        cand_link, lists_link = LINKS_BY_YEAR[year]
-        download_file(cand_link, year_dirname)
-        download_file(lists_link, year_dirname)
+        for link in LINKS_BY_YEAR[year]:
+            download_file(link, year_dirname)
 
         unzip_all_files(year_dirname)
         csv_files = load_csv_files(year_dirname)
 
         upload_csv_files(minio_client, year, csv_files)
 
-    remove_directory(directory)
+    # remove_directory(directory)
 
 
 if __name__ == "__main__":

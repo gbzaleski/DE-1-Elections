@@ -19,7 +19,7 @@ def create_bucket_if_not_exist(minio_client: minio.Minio, minio_bucket_name: str
     if not minio_client.bucket_exists(minio_bucket_name):
         minio_client.make_bucket(minio_bucket_name)
 
-def upload(minio_client: minio.Minio, minio_bucket_name: str, object_name: str, filepath_local: str):
+def upload_file(minio_client: minio.Minio, minio_bucket_name: str, object_name: str, filepath_local: str):
     print(filepath_local)
     minio_client.fput_object(minio_bucket_name, object_name, filepath_local)
 
