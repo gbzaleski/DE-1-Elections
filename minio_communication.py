@@ -13,11 +13,11 @@ def _get_minio_endpoint_str() -> str:
     # return minio_endpoint_host + ":" + minio_port
 
 def _get_minio_access_key() -> str:
-    key = os.environ["MINIO_ACCESS_KEY"]
+    key = os.environ.get("MINIO_ACCESS_KEY", "admin")
     return key
 
 def _get_minio_secret_key() -> str:
-    secret = os.environ["MINIO_SECRET_KEY"]
+    secret = os.environ.get("MINIO_SECRET_KEY", "admin")
     return secret
 
 def create_bucket_if_not_exist(minio_client: minio.Minio, minio_bucket_name: str):
