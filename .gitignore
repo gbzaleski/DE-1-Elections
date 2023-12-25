@@ -1,1 +1,4 @@
 .minio-data
+venv
+.idea
+
