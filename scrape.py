@@ -56,7 +56,7 @@ def load_csv_files(path: str) -> List[Tuple[str, str]]:
             if file.endswith(".csv"):
                 file_path = os.path.join(root, file)
                 with open(file_path, "r") as f:
-                    csv_files.append((file, f.read()))
+                    csv_files.append((file_path, f.read()))
     return csv_files
 
 
@@ -74,7 +74,7 @@ def upload_csv_files(minio_client: minio.Minio, year: int, csv_files: List[Tuple
 
 def main() -> None:
     directory = temporary_direrctory()
-    # minio_client = minio_communication.get_client()
+    minio_client = minio_communication.get_client()
 
     for year in LINKS_BY_YEAR:
         year_dirname = os.path.join(directory, str(year))
@@ -87,7 +87,7 @@ def main() -> None:
         unzip_all_files(year_dirname)
         csv_files = load_csv_files(year_dirname)
 
-        # upload_csv_files(minio_client, year, csv_files)
+        upload_csv_files(minio_client, year, csv_files)
 
     remove_directory(directory)
 
