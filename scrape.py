@@ -22,8 +22,7 @@ LINKS_BY_YEAR = {
 
 def temporary_direrctory() -> str:
     """Create temporary directory and return path to it."""
-    return "/home/mateusz/mnowakowski/de-data/"
-    # return tempfile.mkdtemp()
+    return tempfile.mkdtemp()
 
 
 def remove_directory(path: str) -> None:
@@ -88,7 +87,7 @@ def main() -> None:
 
         upload_csv_files(minio_client, year, csv_files)
 
-    # remove_directory(directory)
+    remove_directory(directory)
 
 
 if __name__ == "__main__":
