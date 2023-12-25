@@ -6,6 +6,8 @@ import sys
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Tuple
 import pandas as pd
+
+import minio_communication
 from DivisorMethods import * 
 
 CONSTITUENCIES = 41
@@ -176,10 +178,6 @@ def select_method(method: str) -> Apportionment:
     # Method not implemented:
     raise NotImplementedError()
 
-def init_minio() -> minio.Minio:
-    key = os.environ["MINIO_ACCESS_KEY"]
-    secret = os.environ["MINIO_SECRET_KEY"]
-    pass
 
 def save_results(minio_client: minio.Minio, votes: Dict[str, int], info: Dict[Any, Any]) -> None:
     pass
@@ -187,7 +185,7 @@ def save_results(minio_client: minio.Minio, votes: Dict[str, int], info: Dict[An
 
 def main() -> None:
     apportionment = select_method(sys.argv[1])
-    minio_client = init_minio()
+    minio_client = minio_communication.get_client()
     district_results = None # TODO: get district results from minio
     candadates_results = None # TODO: get candadates results from minio
     apportionment.load_data(district_results, candadates_results)
