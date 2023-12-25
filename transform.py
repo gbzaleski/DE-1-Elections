@@ -190,7 +190,7 @@ class FairVoteWeightDhonth(Apportionment):
         worst = self.ed.sort_values('Voter Strength').iloc[0]
         best = self.ed.sort_values('Voter Strength').iloc[-1]
         diff = float((best['Voter Strength'] + 100) / ((worst['Voter Strength'] + 100)))
-        
+
         result2 = (f"Voters in {best['Siedziba OKW']} have vote {round(diff, 4)}x as strong as voters in {worst['Siedziba OKW']}")
         full_comparison2 = self.ed.sort_values('Voter Strength').iloc[:, [2,0,16,17]]
 
@@ -246,12 +246,12 @@ def seats_obj_name(apportionment) -> str:
 
 
 def write_dict_json_to_minio(minio_client, bucket_name, object_name, dict_to_write):
-    json_string = json.dumps(dict_to_write)
+    json_string_bytes = json.dumps(dict_to_write).encode("utf-8")
     minio_client.put_object(
         bucket_name,
         object_name,
-        json_string,
-        len(json_string),
+        io.BytesIO(json_string_bytes),
+        len(json_string_bytes),
         content_type='application/json'
     )
 
