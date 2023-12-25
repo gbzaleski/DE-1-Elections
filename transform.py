@@ -245,17 +245,31 @@ def seats_obj_name(apportionment) -> str:
     return f"{apportionment.name()}-seats.csv"
 
 
+def write_dict_json_to_minio(minio_client, bucket_name, object_name, dict_to_write):
+    json_string = json.dumps(dict_to_write)
+    minio_client.put_object(
+        bucket_name,
+        object_name,
+        json_string,
+        len(json_string),
+        content_type='application/json'
+    )
+
+def write_csv_bytes_to_minio(minio_client, bucket_name, object_name, df):
+    buffer = io.BytesIO()
+    df.to_csv(buffer, index=False, encoding="utf-8")
+
+    buffer_bytes = buffer.getvalue()
+
+    minio_client.put_object(bucket_name, object_name,
+                            io.BytesIO(buffer_bytes), len(buffer_bytes), content_type='text/csv')
+
+
 def save_results(minio_client: minio.Minio, bucket_configuration: minio_communication.MinioBucketConfigurationForYear, apportionment: Apportionment, seats: Dict[str, int], additional_info: Dict[Any, Any]) -> None:
-    additional_info_json_bytes = json.dumps(additional_info).encode("utf-8")
+    minio_communication.create_bucket_if_not_exist(minio_client, bucket_configuration.transformed_data_bucket)
 
-    seats_df = apportionment.encode_number_of_seats_in_df(seats)
-    seats_bytes_buffer = io.BytesIO()
-    seats_df.to_csv(seats_bytes_buffer, index=False, encoding="utf-8")
-
-    seats_bytes = seats_bytes_buffer.getvalue()
-
-    minio_client.put_object(bucket_configuration.transformed_data_bucket, seats_obj_name(apportionment), io.BytesIO(seats_bytes), len(seats_bytes), content_type='text/csv')
-
+    write_dict_json_to_minio(minio_client, bucket_configuration.transformed_data_bucket, additional_info_obj_name(apportionment), additional_info)
+    write_csv_bytes_to_minio(minio_client, bucket_configuration.transformed_data_bucket, seats_obj_name(apportionment), apportionment.encode_number_of_seats_in_df(seats))
 
 def load_districts(minio_client, bucket_configuration: minio_communication.MinioBucketConfigurationForYear, year):
     response = minio_client.get_object(bucket_configuration.raw_data_bucket, FILENAMES_BY_YEAR[year]["districts"])
