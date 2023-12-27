@@ -1,3 +1,5 @@
+mkdir -p .minio-data
+
 MINIO_DATA_ABSOLUTE_PATH="$(dirname $0)/.minio-data"
 
 ACCESS_KEY="admin"
