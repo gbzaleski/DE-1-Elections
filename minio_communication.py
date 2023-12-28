@@ -41,7 +41,3 @@ def get_minio_bucket_configuration(year: int) -> MinioBucketConfigurationForYear
         raw_data_bucket="raw-data-{}".format(year),
         transformed_data_bucket="transformed-data-{}".format(year)
     )
-
-
-
-

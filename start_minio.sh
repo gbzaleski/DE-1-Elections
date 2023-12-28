@@ -19,7 +19,6 @@ docker run \
    -p 9090:9090 \
    --name minio \
    -v $MINIO_DATA_ABSOLUTE_PATH:/data \
-   --network de_network \
    -e "MINIO_ROOT_USER=$ACCESS_KEY" \
    -e "MINIO_ROOT_PASSWORD=$SECRET_KEY" \
    quay.io/minio/minio server /data --console-address ":9090"

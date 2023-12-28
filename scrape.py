@@ -33,6 +33,7 @@ def remove_directory(path: str) -> None:
 def download_file(url: str, path: str) -> None:
     """Download file from url and save it to path."""
     filename = url.split("/")[-1]
+    print(f"Downloading {filename} to {path}")
     urllib.request.urlretrieve(url, path + "/" + filename)
 
 
