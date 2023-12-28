@@ -5,8 +5,6 @@
 Scrape the data from the website https://wybory.gov.pl/sejmsenat2023/pl/dane_w_arkuszach/ and save it in a csv file
 to minio.
 
-TODO: Drop the files to minio
-TODO: Scripts to start minio in docker and stop it
 
 ## Step 2:
 
@@ -30,3 +28,22 @@ TODO: Create some interesting visualizations of results
 
 Propositions of visualizations:
 * ...
+
+## Other TODOs:
+
+* Move constants to `consts.py`  
+* Make `name()` method in `Apportionment`  abstract  class  
+* Make thresholds method-specific  
+
+
+
+# Grzegoorz's TODOs:
+
+* Refactor `DivisorMethods.py` and add typing...  
+* Add typing in `transform.py`  
+* Make the existing method work ... 
+
+
+
+
+
