@@ -4,15 +4,13 @@ import argparse
 import io
 import json
 import minio
-import os
-import sys
-import tempfile
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Tuple
 import pandas as pd
 
 import minio_communication
 from DivisorMethods import * 
+
 
 CONSTITUENCIES = 41
 
@@ -27,8 +25,6 @@ FILENAMES_BY_YEAR = {
         "districts": "okregi_sejm_utf8.csv"
     }
 }
-
-
 
 
 class Apportionment(ABC):

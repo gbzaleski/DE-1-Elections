@@ -28,3 +28,22 @@ TODO: Create some interesting visualizations of results
 
 Propositions of visualizations:
 * ...
+
+## Other TODOs:
+
+* Move constants to `consts.py`  
+* Make `name()` method in `Apportionment`  abstract  class  
+* Make thresholds method-specific  
+
+
+
+# Grzegoorz's TODOs:
+
+* Refactor `DivisorMethods.py` and add typing...  
+* Add typing in `transform.py`  
+* Make the existing method work ... 
+
+
+
+
+

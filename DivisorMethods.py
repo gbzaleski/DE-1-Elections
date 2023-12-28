@@ -1,7 +1,7 @@
-
-from queue import PriorityQueue
 from abc import abstractmethod
 from math import floor
+from queue import PriorityQueue
+
 
 class DivisorMethodNode:
     def __init__(self, name, votes, seats = 0) -> None:
@@ -11,7 +11,7 @@ class DivisorMethodNode:
     
     @abstractmethod
     def __gt__(self, other) -> bool:
-         pass    
+        pass    
     
     def __eq__(self, other) -> bool:
         return self.name == other.name
