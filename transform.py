@@ -10,21 +10,7 @@ import pandas as pd
 
 import minio_communication
 from DivisorMethods import * 
-
-
-CONSTITUENCIES = 41
-
-
-FILENAMES_BY_YEAR = {
-    2019: {
-        "results": "wyniki_gl_na_listy_po_okregach_sejm_utf8.csv",
-        "districts": "okregi_sejm_utf8.csv"
-    },
-    2023: {
-        "results": "wyniki_gl_na_listy_po_okregach_sejm_utf8.csv",
-        "districts": "okregi_sejm_utf8.csv"
-    }
-}
+from consts import *
 
 
 class Apportionment(ABC):
@@ -35,16 +21,16 @@ class Apportionment(ABC):
     def name() -> str:
         pass
 
-
-    #To chyba powinno byc wspolne dla wszystkich metod
-    def load_data(self, results, districts) -> None:
+    def load_data(self, year, results, districts) -> None:
         """Loads the data about the results of the elections."""
 
         # Data from https://wybory.gov.pl/sejmsenat2023/pl/dane_w_arkuszach
         # te dwa ready to argumenty z minio
         df = results.fillna(0)
-        parties = pd.concat([df, df.apply(['sum'])]).iloc[:, 25:].set_index([pd.Index(range(1, CONSTITUENCIES + 2))])
-        constituences = districts.iloc[:, [0,1,5,6]].set_index('Numer okręgu')
+        idx = 23 if year == 2019 else 25
+        idxs = [0,1,2,6] if year == 2019 else [0,1,5,6]
+        parties = pd.concat([df, df.apply(['sum'])]).iloc[:, idx:].set_index([pd.Index(range(1, CONSTITUENCIES + 2))])
+        constituences = districts.iloc[:, idxs].set_index('Numer okręgu')
 
         # Joining results with constituences information
         ed = constituences.join(parties) # election data
@@ -60,6 +46,7 @@ class Apportionment(ABC):
         self.ed = ed
 
     # Checking if given party can participate in seats allocation
+    # Default polish threshold, can be overriden in child classes
     def pass_threshold(self, committy, ed) -> bool:
         supp_share = 100 * ed.loc['sum'][committy] / ed.loc['sum']['Liczba głosów ważnych oddanych łącznie na wszystkie listy kandydatów']
         threshold = 5 # Regular Committy
@@ -113,6 +100,14 @@ class ConstituencialDHondt(Apportionment):
 
         return (sum_parties, last_seat_data)
 
+class ConstituencialDHondtNoThreshold(ConstituencialDHondt):
+    @staticmethod
+    def name() -> str:
+        return "constituencial-dhondt-no-threshold"
+
+    def pass_threshold(self, committy, ed) -> bool:
+        return True
+
 
 class GlobalDHondt(Apportionment): 
     @staticmethod
@@ -123,7 +118,16 @@ class GlobalDHondt(Apportionment):
     def calculate(self) -> Tuple[Dict[str, int], Dict[Any, Any]]:
         data_global = [(com, self.ed.loc["sum"][com]) for com in self.comitties]
         result, last_seat_data = runDHondt(data_global, self.SEATS)
-        return (result, {"last_seat_data":last_seat_data}) 
+        return (result, {"last_seat_data":last_seat_data})
+
+
+class GlobalDHondtNoThreshold(GlobalDHondt):
+    @staticmethod
+    def name() -> str:
+        return "global-dhondt-no-threshold"
+
+    def pass_threshold(self, committy, ed) -> bool:
+        return True
 
 
 class SquaredDHondt(Apportionment): 
@@ -158,6 +162,15 @@ class ConstituencialSainteLague(Apportionment):
         return (sum_parties, None)
 
 
+class ConstituencialSainteLagueNoThreshold(ConstituencialSainteLague):
+    @staticmethod
+    def name() -> str:
+        return "constituencial-sainte-lague-no-threshold"
+
+    def pass_threshold(self, committy, ed) -> bool:
+        return True
+
+
 class GlobalSainteLague(Apportionment):
     @staticmethod
     def name() -> str:
@@ -170,11 +183,19 @@ class GlobalSainteLague(Apportionment):
         return (result, None)  
 
 
-class FairVoteWeightDhonth(Apportionment):
+class GlobalSainteLagueNoThreshold(GlobalSainteLague):
     @staticmethod
     def name() -> str:
-        return "fair-vote-weight-dhonth"
+        return "global-sainte-lague-no-threshold"
 
+    def pass_threshold(self, committy, ed) -> bool:
+        return True
+
+
+class FairVoteWeightDHondt(Apportionment):
+    @staticmethod
+    def name() -> str:
+        return "fair-vote-weight-dhondt"
 
     def calculate(self):
         self.ed['True proportion'] = self.ed['Liczba głosów ważnych oddanych łącznie na wszystkie listy kandydatów'] * self.SEATS / self.VOTES
@@ -233,11 +254,26 @@ def select_method(method: str) -> Apportionment:
     """Selects the method of counting votes based on the name."""
     if method == ConstituencialSainteLague.name():
         return ConstituencialSainteLague()
-    if method == "dhondt":
-        raise NotImplementedError()
+    if method == GlobalSainteLague.name():
+        return GlobalSainteLague()
+    if method == ConstituencialDHondt.name():
+        return ConstituencialDHondt()
+    if method == GlobalDHondt.name():
+        return GlobalDHondt()
+    if method == SquaredDHondt.name():
+        return SquaredDHondt()
+    if method == FairVoteWeightDHondt.name():
+        return FairVoteWeightDHondt()
+    if method == ConstituencialSainteLagueNoThreshold.name():
+        return ConstituencialSainteLagueNoThreshold()
+    if method == GlobalSainteLagueNoThreshold.name():
+        return GlobalSainteLagueNoThreshold()
+    if method == ConstituencialDHondtNoThreshold.name():
+        return ConstituencialDHondtNoThreshold()
+    if method == GlobalDHondtNoThreshold.name():
+        return GlobalDHondtNoThreshold()
     
-    # Method not implemented:
-    raise NotImplementedError()
+    raise NotImplementedError(method)
 
 
 def additional_info_obj_name(apportionment) -> str:
@@ -287,7 +323,7 @@ def load_results(minio_client, bucket_configuration: minio_communication.MinioBu
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument('--year', type=int, default=2023,
+    parser.add_argument('--year', type=int, choices=YEARS, default=2023,
                         help='year to analyze')
     parser.add_argument('--apportionment', type=str, default=ConstituencialSainteLague.name(),
                         help='apportionment')
@@ -300,9 +336,9 @@ def main() -> None:
     bucket_configuration = minio_communication.get_minio_bucket_configuration(program_args.year)
 
     districts = load_districts(minio_client, bucket_configuration, program_args.year)
-    results = load_results(minio_client, bucket_configuration, program_args.year) # TODO: get candadates results from minio
+    results = load_results(minio_client, bucket_configuration, program_args.year)
 
-    apportionment.load_data(results, districts)
+    apportionment.load_data(program_args.year, results, districts)
     seats, info = apportionment.calculate()
     save_results(minio_client, bucket_configuration, apportionment, seats, info)
 

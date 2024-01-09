@@ -3,16 +3,19 @@ import os
 
 import minio
 
+from consts import *
+
+
 def _get_minio_endpoint_str() -> str:
-    minio_server = os.environ.get("MINIO_SERVER_URL", "localhost:9000")
+    minio_server = os.environ.get("MINIO_SERVER_URL", MINIO_DEFAULT_SERVER_URL)
     return minio_server
 
 def _get_minio_access_key() -> str:
-    key = os.environ.get("MINIO_ACCESS_KEY", "admin")
+    key = os.environ.get("MINIO_ACCESS_KEY", MINIO_DEFAULT_USER)
     return key
 
 def _get_minio_secret_key() -> str:
-    secret = os.environ.get("MINIO_SECRET_KEY", "adminadmin")
+    secret = os.environ.get("MINIO_SECRET_KEY", MINIO_DEFAULT_PASSWORD)
     return secret
 
 def create_bucket_if_not_exist(minio_client: minio.Minio, minio_bucket_name: str):

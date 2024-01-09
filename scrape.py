@@ -10,15 +10,8 @@ from typing import List, Tuple
 
 import minio_communication
 
-LINKS_BY_YEAR = {
-    2019: [
-        "https://wybory.gov.pl/sejmsenat2019/data/csv/okregi_sejm_csv.zip",
-        "http://wybory.gov.pl/sejmsenat2019/data/csv/wyniki_gl_na_listy_po_okregach_sejm_csv.zip"],
-    2023: [
-        "http://wybory.gov.pl/sejmsenat2023/data/csv/okregi_sejm_csv.zip",
-        "http://wybory.gov.pl/sejmsenat2023/data/csv/wyniki_gl_na_listy_po_okregach_sejm_csv.zip"
-    ]
-}
+from consts import LINKS_BY_YEAR
+
 
 def temporary_direrctory() -> str:
     """Create temporary directory and return path to it."""
