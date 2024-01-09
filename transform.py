@@ -52,17 +52,16 @@ class Apportionment(ABC):
 
         # Calculating which comitties pass the threshold
         comitties = [ele for ele in list(ed.columns) if 'KOMITET' in ele]
-        comitties = [ele for ele in comitties if self.pass_threshold(ele)]
+        comitties = [ele for ele in comitties if self.pass_threshold(ele, ed)]
 
         self.SEATS = ed.loc['sum']['Liczba mandatów']
         self.VOTES = ed.loc['sum']['Liczba głosów ważnych oddanych łącznie na wszystkie listy kandydatów']
         self.comitties = comitties
         self.ed = ed
-        # Zapisac SEATS,VOTES,comitties i election data w obiekcie
 
     # Checking if given party can participate in seats allocation
-    def pass_threshold(self, committy) -> bool:
-        supp_share = 100 * self.ed.loc['sum'][committy] / self.ed.loc['sum']['Liczba głosów ważnych oddanych łącznie na wszystkie listy kandydatów']
+    def pass_threshold(self, committy, ed) -> bool:
+        supp_share = 100 * ed.loc['sum'][committy] / ed.loc['sum']['Liczba głosów ważnych oddanych łącznie na wszystkie listy kandydatów']
         threshold = 5 # Regular Committy
         if 'KOALICYJNY' in committy: 
             threshold = 8 # Coalition Committy
@@ -70,6 +69,13 @@ class Apportionment(ABC):
             threshold = 0 # Minority Commity
         return threshold <= supp_share
 
+    # Reads voting results from one constituency
+    def read_constituency_info(self, id): 
+        row = self.ed.loc[id]
+        cname = row['Siedziba OKW']
+        seats = row['Liczba mandatów']
+        data = [(name, row[name]) for name in self.comitties]
+        return (data, seats, cname)
 
     @abstractmethod
     def calculate(self) -> Tuple[Dict[str, int], Dict[Any, Any]]:
@@ -98,7 +104,7 @@ class ConstituencialDHondt(Apportionment):
         last_seat_data = {}
 
         for id in range(1, CONSTITUENCIES + 1):
-            data, seats, cname = None # Read from minio TODO
+            data, seats, cname = self.read_constituency_info(id)
             result, last_win_info = runDHondt(data, seats)
             for (key, val) in result:
                 sum_parties[key] += val
@@ -144,8 +150,8 @@ class ConstituencialSainteLague(Apportionment):
         sum_parties = dict([(name, 0) for name in self.comitties])
 
         for id in range(1, CONSTITUENCIES + 1):
-            data, seats, cname = None # Read from minio TODO
-            result, _ = runDHondt(data, seats)
+            data, seats, cname = self.read_constituency_info(id)
+            result, _ = runSainteLague(data, seats)
             for (key, val) in result:
                 sum_parties[key] += val
 
@@ -160,8 +166,8 @@ class GlobalSainteLague(Apportionment):
 
     def calculate(self) -> Tuple[Dict[str, int], Dict[Any, Any]]:
         data_global = [(com, self.ed.loc["sum"][com]) for com in self.comitties]
-        result, last_seat_data = runSainteLague(data_global, self.SEATS)
-        return (result, {"last_seat_data":last_seat_data})  
+        result, _ = runSainteLague(data_global, self.SEATS)
+        return (result, None)  
 
 
 class FairVoteWeightDhonth(Apportionment):
@@ -179,6 +185,7 @@ class FairVoteWeightDhonth(Apportionment):
         result1 = (f"Voters in {best['Siedziba OKW']} have vote {round(diff, 4)}x as strong as voters in {worst['Siedziba OKW']}")
         full_comparison1 = self.ed.sort_values('Voter Strength').iloc[:, [2,0,16,17]]
         
+        # Updating seat allocation
         paramHM = self.find_HMpar(self)
         self.ed['Liczba mandatów'] = self.ed['True proportion'].apply(lambda x: round(x + paramHM))
 
@@ -199,13 +206,12 @@ class FairVoteWeightDhonth(Apportionment):
         extra_data["Full comparison after"] = full_comparison2
 
         for id in range(1, CONSTITUENCIES + 1):
-            data, seats, cname = None
+            data, seats, cname = self.read_constituency_info(id)
             result, _ = runDHondt(data, seats)
             for (key, val) in result:
                 sum_parties[key] += val
         
         return (sum_parties, extra_data)
-
 
     # Hare-Nemayer rounding
     def find_HMpar(self):
