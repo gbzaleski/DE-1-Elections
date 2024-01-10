@@ -28,7 +28,7 @@ class Apportionment(ABC):
         # te dwa ready to argumenty z minio
         df = results.fillna(0)
         idx = 23 if year == 2019 else 25
-        idxs = [0,1,2,6] if year == 2019 else [0,1,5,6]
+        idxs = [1,2,6,0] if year == 2019 else [0,1,5,6]
         parties = pd.concat([df, df.apply(['sum'])]).iloc[:, idx:].set_index([pd.Index(range(1, CONSTITUENCIES + 2))])
         constituences = districts.iloc[:, idxs].set_index('Numer okręgu')
 
@@ -76,8 +76,10 @@ class Apportionment(ABC):
 
 
     @staticmethod
-    def encode_number_of_seats_in_df(seats: Dict[str, int]) -> pd.DataFrame:
-        return pd.DataFrame(list(seats.items()), columns=['party', 'seats'])
+    def encode_number_of_seats_in_df(seats) -> pd.DataFrame:
+        if isinstance(seats, dict):
+            seats = list(seats.items())
+        return pd.DataFrame(seats, columns=['party', 'seats'])
 
 
 # Current system
@@ -204,10 +206,10 @@ class FairVoteWeightDHondt(Apportionment):
         best = self.ed.sort_values('Voter Strength').iloc[-1]
         diff = float((best['Voter Strength'] + 100) / ((worst['Voter Strength'] + 100)))
         result1 = (f"Voters in {best['Siedziba OKW']} have vote {round(diff, 4)}x as strong as voters in {worst['Siedziba OKW']}")
-        full_comparison1 = self.ed.sort_values('Voter Strength').iloc[:, [2,0,16,17]]
+        full_comparison1 = self.ed.sort_values('Voter Strength').iloc[:, [2,0,-2,-1]]
         
         # Updating seat allocation
-        paramHM = self.find_HMpar(self)
+        paramHM = self.find_HMpar()
         self.ed['Liczba mandatów'] = self.ed['True proportion'].apply(lambda x: round(x + paramHM))
 
         # Updated voter strength
@@ -217,14 +219,14 @@ class FairVoteWeightDHondt(Apportionment):
         diff = float((best['Voter Strength'] + 100) / ((worst['Voter Strength'] + 100)))
 
         result2 = (f"Voters in {best['Siedziba OKW']} have vote {round(diff, 4)}x as strong as voters in {worst['Siedziba OKW']}")
-        full_comparison2 = self.ed.sort_values('Voter Strength').iloc[:, [2,0,16,17]]
+        full_comparison2 = self.ed.sort_values('Voter Strength').iloc[:, [2,0,-2,-1]]
 
         sum_parties = dict([(name, 0) for name in self.comitties])
         extra_data = {}
         extra_data["Vote Strength before"] = result1
         extra_data["Vote Strength after"] = result2 
-        extra_data["Full comparison befere"] = full_comparison1
-        extra_data["Full comparison after"] = full_comparison2
+        extra_data["Full comparison befere"] = full_comparison1.to_dict()
+        extra_data["Full comparison after"] = full_comparison2.to_dict()
 
         for id in range(1, CONSTITUENCIES + 1):
             data, seats, cname = self.read_constituency_info(id)
