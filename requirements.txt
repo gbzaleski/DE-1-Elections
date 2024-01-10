@@ -1,3 +1,4 @@
 minio
 pandas
 ipykernel
+matplotlib

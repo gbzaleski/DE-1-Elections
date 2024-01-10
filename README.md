@@ -19,9 +19,7 @@ Methods:
 * Squared DHondt
 * Fair Vote Weight DHondt
 * Constituencial DHondt without thresholds
-* Global DHondt without thresholds
 * Constituencial Sainte-Lague without thresholds
-* Global Sainte-Lague without thresholds
 
 ## Step 3:
 
