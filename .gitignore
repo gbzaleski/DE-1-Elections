@@ -1,0 +1,6 @@
+.minio-data
+venv
+.idea
+__pycache__
+.ipynb_checkpoints
+.vscode

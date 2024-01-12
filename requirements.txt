@@ -1,0 +1,4 @@
+minio
+pandas
+ipykernel
+matplotlib
